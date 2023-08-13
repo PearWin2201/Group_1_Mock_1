@@ -1,193 +1,239 @@
-#include <stdio.h>
-#include <stdint.h>
-#include <math.h>
+#include "hal.h"
 #include "fat.h"
-
-static uint8_t FAT_ChartoDec(uint8_t Character);
-static uint32_t FAT_StrtoDec(uint8_t * pString, uint8_t Len);
-
-uint32_t RootAddr;
-uint32_t* pDecimal = 0;
-FILE *ptr = NULL;
-
-/* void CheckBoot(ptr)
+#include "linkedlist.h"
+FATnoti FAT_Read_Directory(uint32_t startSector, uint8_t *numFiles)
 {
-	char * OutCheck[2];
-	fseek(ptr, 0x1FE, SEEK_SET);
-	fgets(OutCheck, 2, ptr);
-	if ((OutCheck[0] != '55') || (OutCheck[1] != 'AA'))
-	else CalSec(ptr)
-} */
-
-BootPara CalSec(FILE *ptr)
-{
-	BootPara Sec;
-	
-	// Calculate number of Boot sectors
-	char NumSecBoot[2];
-	fseek(ptr, 0x0e, SEEK_SET);
-	fgets(NumSecBoot, 2, ptr);
-	Sec.NumSec_Boot = FAT_StrtoDec(NumSecBoot, 2);
-	
-	//Calculate number of sectors in FAT tables
-	char *NumTabFAT;
-	fseek(ptr, 0x10, SEEK_SET);
-	fgets(NumTabFAT, 1, ptr);
-	Sec.NumTab_FAT = FAT_StrtoDec(NumTabFAT, 1);
-	
-	char *NumSecFATTab;
-	fseek(ptr, 0x16, SEEK_SET);
-	fgets(NumSecFATTab, 2, ptr);
-	Sec.NumSec_FATTab = FAT_StrtoDec(NumSecFATTab, 2);
-	
-	//Calculate entries of Root Directory
-	char * NumEntRoot;
-	fseek(ptr, 0x11, SEEK_SET);
-	fgets(NumEntRoot, 2, ptr);
-	Sec.NumEnt_Root = FAT_StrtoDec(NumEntRoot, 2);
-	
-	return Sec;
-}
-
-uint32_t CalRootAddr(FILE *ptr)
-{
-	BootPara Sec = CalSec(ptr);
-	RootAddr = Sec.NumSec_Boot * 512 + Sec.NumTab_FAT * Sec.NumSec_FATTab * 512;
-	return RootAddr;
-}
-
-RootPara GetRootData(FILE *ptr)
-{
-	ptr = NULL;
-	uint8_t i, k = CalSec(ptr).NumEnt_Root;
-	RootPara Root[k];
-	ptr = CalRootAddr(ptr);
-	for (i = 0; i < k; i++)
+	printf("\n");	
+	FATnoti retStatus = READ_DIR_OK;
+    uint8_t buffer[SECTOR_SIZE];
+    printf("=======================================================================================\n");
+    printf("================================== READ FILE FAT GROUP 1 ==================================\n");   
+    printf("=======================================================================================\n");
+    printf("=======================================================================================\n");
+    printf("| FILE NAME |\t| EXTENSION |\t| CREATE DATE |\t| CREATE TIME |\t| File Size |\n\n");   
+    uint8_t countNumFiles = 0;
+    uint32_t j;
+	if ( READ_SECTOR_OK == HAL_Read_Sector(startSector, buffer))
 	{
-		fgets(FileName, 8, ptr);
-		Root[k].FileName = FAT_StrtoDec(FileName, 8);
-		fgets(Extension, 3, ptr);
-		Root[k].Extension = FAT_StrtoDec(Extension, 3);
-		fgets(Extension, 3, ptr);
-		Root[k].Attribute = FAT_StrtoDec(Attribute, 1);
-		fgets(Extension, 3, ptr);
-		Root[k].Reserved = FAT_StrtoDec(ptr, 10);
-		fgets(Extension, 3, ptr);
-		Root[k].Time = FAT_StrtoDec(ptr, 2);
-		Root[k].Date = FAT_StrtoDec(ptr, 2);
-		Root[k].FirstCluster = FAT_StrtoDec(ptr, 2);
-		Root[k].FileSize = FAT_StrtoDec(ptr, 4);
-	}
-	return Root[k];
-}
+		for (j = 0; j < SECTOR_SIZE; j += ENTRY_SIZE)
+    	{
+        	if (buffer[j] == 0x2E)
+        	{
+            	continue;
+        	}
 
-uint8_t GetFirstDataAddr(uint32_t m)
-{
-	uint32_t FirstDataAddr;
-	FirstDataAddr = 512 * (31 + (GetRootData(ptr)[m].FirstCluster));
-	return FirstDataAddr;
-}
+        	if (buffer[j] == 0x00)
+        	{
+            
+            	break;
+        	}
 
-void FAT_OpenFile(uint8_t * FileName)
-{
-	fopen(FileName, "r");
-}
+        	if (buffer[j] == 0xE5)
+        	{
+            	
+            	continue;
+        	}
+        	if (buffer[j + 11] == 0x0F)
+        	{
+            	
+            	continue;
+        	}
 
-void FAT_CloseFile(void)
-{
-	fclose(ptr);
-}
-//uint32_t ReadFile(uint8_t * Root[32])
-//{
-//	uint32_t count = 0;
-//	uint32_t FirstCluster, FirstData;
-//	uint32_t i;
-//	count++;
-//	FirstCluster == 16 * &(*Root + 0x1B) + &(*Root + 0x1A);
-//	FirstData == 512 * (FirstCluster + 31);
-//	return FirstData;
-//}
-//
-//ReadEntryList(void)
-//{
-//	
-//}
+        	countNumFiles++;
 
-//FirstData CheckAttribute(Root[])
-//{
-//	uint8_t i;
-//	uint8_t j = 0, k = 0;
-//	FirstData Out;
-//	for (i = 0x260B; i <= 0x41FF; i += 32)
-//	{
-//		if (Root[i] = 0x0F)
-//		continue;
-//		else if (Root[i] == 0x00)
-//		{
-//			FirstCluster = 16 * Root[0x1B] + Root[0x1A];
-//			Out.FileFirstData[j] = 512 * (FirstCluster + 31);
-//			j++;
-//		}
-//		else if (Root[i] == 0x10)
-//		{
-//			FirstCluster = 16 * Root[0x1B] + Root[0x1A];
-//			Out.FolderFirstData[k] = 512 * (FirstCluster + 31);
-//			k++;
-//		}
-//	}
-//	return Out;
-//}
+        	readFat12Entry( &buffer[j], &entry);
 
+        	printFat12Entry(&entry, countNumFiles);
+    	}
 
-//uint8_t CalDataAddr(uint16_t Num)
-//{
-//	uint16_t DataAddr;
-//	DataAddr = 512 * (Num + 31);
-//	return DataAddr;
-//}
-
-static uint8_t FAT_ChartoDec(uint8_t Character)
-{
-	uint8_t retVal;
-	// '0' - '9'
-	if ( ('0' <= Character) && (Character <= '9') )
-	{
-		retVal = Character - '0';
-	}
-	else if ( ('A' <= Character) && (Character <= 'F') )
-	{
-		retVal = Character - 'A' + 10;
+    	(*numFiles) = countNumFiles;
+    	retStatus = READ_DIR_OK;
+    	
+    	if (buffer[0] == 0x2E && buffer[33] == 0x2E && j <= 64)
+    	{
+        	printf("This Folder is empty. Please go back.\n");
+    	}
 	}
 	else
 	{
-		retVal = HEX_INVALID;
+		retStatus = READ_DIR_ERR;
+		printf("Error: Read Directory !");
 	}
-	return retVal;
+
+	printf("\n");
+
+    return retStatus;
 }
 
-static uint32_t FAT_StrtoDec(uint8_t * pString, uint8_t Len)
+FATnoti FAT_Read_FileContent( uint32_t startCluster)
 {
-	// "13" = 1 * 16^1 + 3 * 16^0 = 19
-	// "7AF0" = 
-	// 	7 * 16^3 + 0xA * 16^2 + 0xF * 16^1 + 0 * 16^0 = 31472
-	uint8_t idx;
-	uint8_t dec;
-	// Reset value of output data. When declare the variable * pDecimal, the value of variable != 0;
-	for (idx = Len -1; idx >= 0; idx--)
+	printf("\n");
+	
+	if (entry.fileSize == 0)
+    {
+        printf("This file is empty. Please go back.\n");
+        return;
+    }
+	
+	FATnoti retStatus = READ_CONTENT_OK;
+    uint8_t buffer[SECTOR_SIZE];
+    
+	if ( 0 == fseek(ptr, startCluster * SECTOR_SIZE, SEEK_SET))
 	{
-		dec = FAT_ChartoDec(pString[idx]);
-		if (HEX_INVALID == dec)
-		{
-			break;
-		}
-		else
-		{
-			*pDecimal += dec * pow(16, (Len-1-2*idx));
-		}
+		while (entry.fileSize > 0)
+	    {
+	        uint32_t bytesRead = fread(buffer, sizeof(uint8_t), SECTOR_SIZE, ptr);
+	        if (bytesRead == 0)
+	        {
+	            printf("End of File\n");
+	            break;
+	        }
+	
+	        // Print the buffer content to the console
+	        uint32_t printSize = (entry.fileSize < bytesRead) ? entry.fileSize : bytesRead;
+	
+	        uint32_t i;
+	        for (i = 0; i < printSize; i++)
+	        {
+	            printf("%c", buffer[i]);
+	        }
+	        entry.fileSize -= printSize;
+	
+	        if (entry.fileSize == 0)
+	            break;
+	    }
+	    printf("\n");
+	    printf(
+		"\n");
 	}
-	return *pDecimal;
+	else 
+	{
+		retStatus = SEEK_CONTENT_ERR;
+		printf("Error: Read File Content !");
+	}
+
+    return retStatus;
 }
 
+FATnoti FAT_Get_StartCluster( uint32_t startSector, uint8_t selectedFile, uint32_t *startCluster)
+{
+	FATnoti retStatus 	  = GET_STARTCLUSTER_OK;
+	uint32_t 	i = 0;
+    uint32_t 	j = 0;
+    uint8_t 	buffer[SECTOR_SIZE];
+    
+	
+	if ( READ_SECTOR_OK == HAL_Read_Sector( startSector, (Fat12BootData*)buffer))
+	{
+		while (j < selectedFile)
+	    {
+	        if (buffer[i + 11] == 0x0F || buffer[i] == 0xE5 || buffer[i] == 0x2E)
+	        {
+	            i += ENTRY_SIZE;
+	            continue;
+	        }	
+	        j++;
+	
+	        if (j == selectedFile)
+	        {
+	            readFat12Entry(&buffer[i], &entry);
+	            break;
+	        }	
+	        i += ENTRY_SIZE;
+	    }	
+	    if (entry.attributes & 0x10)
+	    {
+	        entry.isDirectory = true;
+	    }
+	    else
+	    {
+	        entry.isDirectory = false;
+	    }
+	
+	    uint32_t data_region_start_sector = BootData.reserved_sectors + (BootData.number_of_fats * BootData.fat_size_sectors) + (BootData.root_dir_entries * 32 / BootData.bytes_per_sector);
+	    (*startCluster) = ((entry.startCluster - 2) * BootData.sectors_per_cluster) + data_region_start_sector;
+	}
+	else 
+	{
+		retStatus = GET_STARTCLUSTER_ERR;
+		printf("Error: Get Start Cluster !");
+	}
+	
+	return retStatus;    
+}
+ uint32_t read_fattable(uint32_t poscluster)
+{ FILE*file=NULL;
+	char hex[6];
+	uint8_t bytes[2];
+	uint32_t Fatcluster;
+	uint32_t physicalcluster=poscluster*1.5+1;
+	uint32_t PhysicalSector;
+	if(poscluster%3==0)
+	{ 
+	//fseek(file, dectoHex(physicalcluster,hex,5), SEEK_SET);
+	fread(&bytes,sizeof(uint8_t),2,file);
+	Fatcluster=(bytes[1]&0x0f<<2)|bytes[0];
+	
+	}
+	if(poscluster%3==2)
+	{
+	//fseek(file, dectoHex((physicalcluster-1),hex,5), SEEK_SET);
+	fread(&bytes,sizeof(uint8_t),2,file);
+	Fatcluster=(bytes[0]&0xf0)|(bytes[1]<<1);
+	}
+	
+	return PhysicalSector=Fatcluster+33-2;;
+	
+}
+ void readFat12Entry(uint8_t *entryData, Fat12Entry *entry)
+{
+    
+    memcpy(entry->filename, entryData, 8);
+    entry->filename[8] = '\0';
+    memcpy(entry->extension, entryData + 8, 8);
+    entry->extension[8] = '\0';
+    entry->attributes = entryData[11];
+    convertFat12DateTime(*(uint16_t *)(entryData + 16), *(uint16_t *)(entryData + 14), &entry->creationTime);
+    entry->startCluster = *(uint16_t *)(entryData + 26);
+    entry->fileSize = *(uint32_t *)(entryData + 28);
+}
 
+ void convertFat12DateTime(uint16_t date, uint16_t time, Fat12DateTime *dateTime)
+{
+    // Extract the year, month, and day from the date
+    dateTime->year = ((date >> 9) & 0x7f) + 1980;
+    dateTime->month = (date >> 5) & 0x0f;
+    dateTime->day = date & 0x1f;
 
-
+    // Extract the hour, minute, and second from the time
+    dateTime->hour = (time >> 11) & 0x1f;
+    dateTime->minute = (time >> 5) & 0x3f;
+    dateTime->second = (time & 0x1f) * 2;
+}
+ void printFat12Entry(Fat12Entry *entry, uint8_t numFiles)
+{
+    printf("%d/ ", numFiles);
+    printf("%s\t", entry->filename);
+    if (entry->attributes & 0x10)
+    {
+        printf("FILE FOLDER\t");
+    }
+    else
+    {
+        printf("FILE %s\t", entry->extension);
+    }
+    printf("%04d-%02d-%02d\t",
+           entry->creationTime.year, entry->creationTime.month, entry->creationTime.day
+          );
+    printf("%04d:%02d:%02d \t",
+            entry->creationTime.hour, entry->creationTime.minute, entry->creationTime.second);
+    
+    if (entry->fileSize != 0)
+    {
+        printf("%lub\n", entry->fileSize);
+    }
+    else
+    {
+        printf("\n");
+    }
+}
